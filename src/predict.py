@@ -1,23 +1,26 @@
 import pandas as pd
 import joblib
-import xgboost as xgb
 
-def predict_new(csv_path):
-    df = pd.read_csv(csv_path)
+def load_artifacts():
+    pre = joblib.load("models/preprocessor.pkl")
+    model_pre = joblib.load("models/model_pre.pkl")
+    model_early = joblib.load("models/model_early.pkl")
+    model_full = joblib.load("models/model_full.pkl")
+    return pre, model_pre, model_early, model_full
 
-    preprocessor = joblib.load("models/preprocessor.pkl")
-    X = preprocessor.transform(df)
 
-    rf = joblib.load("models/rf_model.pkl")
+def run_prediction(df, mode):
+    pre, model_pre, model_early, model_full = load_artifacts()
 
-    xgb_model = xgb.XGBRegressor()
-    xgb_model.load_model("models/xgb_model.json")
+    df = df.fillna(0)
+    X = pre.transform(df)
 
-    df["pred_completion_rf"] = rf.predict(X)
-    df["pred_completion_xgb"] = xgb_model.predict(X)
+    if mode == "PRE":
+        model = model_pre
+    elif mode == "EARLY":
+        model = model_early
+    else:
+        model = model_full
 
-    return df
-
-if __name__ == "__main__":
-    preds = predict_new("data/fake_kaltura_data.csv")
-    print(preds.head())
+    predictions = model.predict(X)
+    return predictions
