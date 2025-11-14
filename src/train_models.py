@@ -1,36 +1,35 @@
-import pandas as pd
+from preprocess import load_data, preprocess
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 import joblib
-import os
+import pandas as pd
 
-from preprocess import create_preprocessor, preprocess_for_training
+# Load CSV
+df = load_data("data/kaltura_fake_extended.csv")
 
-# -------------- LOAD YOUR TRAINING DATA ----------------
-df = pd.read_csv("data/kaltura_fake_extended.csv")
+# Save targets separately
+y1 = df["avg_completion_rate"]
+y2 = df["avg_view_drop_off"]
 
-df = preprocess_for_training(df)
+# Preprocess input features
+X = preprocess(df)
 
-# Columns to predict (example targets)
-TARGET = "avg_completion_rate"
+# Scale inputs
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
 
-# ---------------- CREATE PREPROCESSOR -------------------
-preprocessor, num_cols, cat_cols = create_preprocessor(df)
-preprocessor.fit(df)
+# Save preprocessor
+joblib.dump(scaler, "models/preprocessor.pkl")
+print("Saved preprocessor")
 
-os.makedirs("models", exist_ok=True)
-joblib.dump(preprocessor, "models/preprocessor.pkl")
-print("Saved: models/preprocessor.pkl")
+# Train models
+rf1 = RandomForestRegressor(n_estimators=300, random_state=42)
+rf1.fit(X_scaled, y1)
+joblib.dump(rf1, "models/xgb_completion.pkl")
+print("Saved xgb_completion.pkl")
 
-# ---------------- TRAIN 3 MODELS ------------------------
-modes = ["pre", "early", "full"]
-
-for mode in modes:
-    model = RandomForestRegressor(n_estimators=300, random_state=42)
-
-    X = df.drop(columns=[TARGET])
-    y = df[TARGET]
-
-    model.fit(X, y)
-
-    joblib.dump(model, f"models/model_{mode}.pkl")
-    print(f"Saved: models/model_{mode}.pkl")
+rf2 = RandomForestRegressor(n_estimators=300, random_state=42)
+rf2.fit(X_scaled, y2)
+joblib.dump(rf2, "models/xgb_dropoff.pkl")
+print("Saved xgb_dropoff.pkl")
