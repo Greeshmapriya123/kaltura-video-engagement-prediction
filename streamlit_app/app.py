@@ -1,54 +1,30 @@
 import streamlit as st
 import pandas as pd
-import joblib
-import xgboost as xgb
-import matplotlib.pyplot as plt
-import numpy as np
+from src.predict import run_prediction
 
-st.title("🎥 Kaltura Video Engagement Prediction App")
-st.write("Upload a CSV file to predict:")
-st.write("- Average Completion Rate")
-st.write("- Engagement Drop-Off Risk")
+st.set_page_config(page_title="Kaltura Video Engagement Predictor", layout="wide")
 
-uploaded_file = st.file_uploader("Upload CSV", type=["csv"])
+st.title("🎬 Kaltura Video Engagement Prediction App")
 
-# Load models
-preprocessor = joblib.load("models/preprocessor.pkl")
-rf_model = joblib.load("models/rf_model.pkl")
+st.write("""
+Upload a CSV file containing Kaltura video metadata or engagement features.
+Select the mode to generate predictions.
+""")
 
-xgb_model = xgb.XGBRegressor()
-xgb_model.load_model("models/xgb_model.json")
+mode = st.selectbox("Select Prediction Mode:", ["PRE", "EARLY", "FULL"])
+
+uploaded_file = st.file_uploader("Upload CSV file", type=["csv"])
 
 if uploaded_file:
     df = pd.read_csv(uploaded_file)
-    st.subheader("📄 Preview")
-    st.dataframe(df.head())
+    st.write("### Preview:", df.head())
 
-    # Preprocess
-    X = preprocessor.transform(df)
+    if st.button("Generate Predictions"):
+        preds = run_prediction(df, mode)
+        df[f"predicted_{mode.lower()}"] = preds
 
-    # Predictions
-    df["pred_rf"] = rf_model.predict(X)
-    df["pred_xgb"] = xgb_model.predict(X)
+        st.success("Prediction Completed!")
+        st.write(df.head())
 
-    df["risk"] = np.where(df["pred_rf"] < 30, "HIGH",
-                          np.where(df["pred_rf"] < 60, "MEDIUM", "LOW"))
-
-    st.subheader("🚀 Predictions")
-    st.dataframe(df)
-
-    # Download button
-    csv = df.to_csv(index=False)
-    st.download_button("Download Predictions", csv, "predictions.csv")
-
-    # Feature Importance
-    st.subheader("📊 Feature Importance (Random Forest)")
-    importances = rf_model.feature_importances_
-    feature_names = preprocessor.get_feature_names_out()
-
-    idx = np.argsort(importances)[-10:]
-    fig, ax = plt.subplots(figsize=(7, 4))
-    ax.barh(feature_names[idx], importances[idx])
-    st.pyplot(fig)
-else:
-    st.info("Please upload a CSV file.")
+        csv_download = df.to_csv(index=False).encode("utf-8")
+        st.download_button("Download Predictions", csv_download, "predictions.csv")
