@@ -2,8 +2,7 @@ streamlit
 pandas
 numpy
 scikit-learn
-tensorflow
+xgboost
 joblib
 matplotlib
-xgboost
 protobuf==3.20.3
