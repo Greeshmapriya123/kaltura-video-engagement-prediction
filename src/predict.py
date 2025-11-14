@@ -1,42 +1,60 @@
-import joblib
 import pandas as pd
+import joblib
 import numpy as np
 
-# Load preprocessor + models
+# -------------------------------------------------------
+# Load all saved model artifacts
+# -------------------------------------------------------
 preprocessor = joblib.load("models/preprocessor.pkl")
 model_completion = joblib.load("models/xgb_completion.pkl")
 model_dropoff = joblib.load("models/xgb_dropoff.pkl")
 
+# These are the ONLY 13 features the model was trained on
+TRAIN_FEATURES = [
+    "minutes",
+    "media_type",
+    "entry_source",
+    "count_plays",
+    "count_loads",
+    "load_play_ratio",
+    "sum_time_viewed",
+    "avg_time_viewed",
+    "avg_view_drop_off",
+    "unique_known_users",
+    "engagement_ranking",
+    "avg_completion_rate",
+    "unique_viewers"
+]
+
+
 def run_prediction(df):
-    """
-    df: raw uploaded dataframe from user
-    returns: dataframe with predictions
-    """
 
-    # 1️⃣ Select the exact same features used during training
-    feature_cols = [
-        "media_type", "duration_msecs", "count_plays", "sum_time_viewed",
-        "avg_time_viewed", "count_loads", "load_play_ratio",
-        "unique_known_users", "engagement_ranking"
-    ]
-
-    # Check missing columns
-    missing = [c for c in feature_cols if c not in df.columns]
+    # ---------------------------------------------------
+    # 1. Filter & align columns automatically
+    # ---------------------------------------------------
+    missing = [c for c in TRAIN_FEATURES if c not in df.columns]
     if missing:
         raise ValueError(f"Missing required columns: {missing}")
 
-    X = df[feature_cols]
+    # Keep only the required columns
+    df = df[TRAIN_FEATURES].copy()
 
-    # 2️⃣ Transform through preprocessor
-    X_processed = preprocessor.transform(X)
+    # ---------------------------------------------------
+    # 2. Transform using saved preprocessor
+    # ---------------------------------------------------
+    X = preprocessor.transform(df)
 
-    # 3️⃣ Predict using both models
-    pred_completion = model_completion.predict(X_processed)
-    pred_dropoff = model_dropoff.predict(X_processed)
+    # ---------------------------------------------------
+    # 3. Make predictions
+    # ---------------------------------------------------
+    pred_completion = model_completion.predict(X)
+    pred_dropoff = model_dropoff.predict(X)
 
-    # 4️⃣ Combine output
-    result = df.copy()
-    result["predicted_completion_rate"] = np.round(pred_completion, 2)
-    result["predicted_dropoff_risk"] = np.round(pred_dropoff, 2)
+    # ---------------------------------------------------
+    # 4. Return results as dataframe
+    # ---------------------------------------------------
+    output = df.copy()
+    output["pred_avg_completion_rate"] = pred_completion
+    output["pred_avg_view_drop_off"] = pred_dropoff
 
-    return result
+    return output
