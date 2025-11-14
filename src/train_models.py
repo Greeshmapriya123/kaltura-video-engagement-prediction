@@ -1,32 +1,36 @@
-import joblib
-from preprocess import load_data, build_preprocessor, preprocess
+import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import r2_score
-import xgboost as xgb
-import json
+import joblib
+import os
 
-df = load_data("data/fake_kaltura_data.csv")
-preprocessor = build_preprocessor()
+from preprocess import create_preprocessor, preprocess_for_training
 
-X, y1, y2 = preprocess(df, preprocessor)
+# -------------- LOAD YOUR TRAINING DATA ----------------
+df = pd.read_csv("data/kaltura_fake_extended.csv")
 
-# ------------------------------
-# Train Random Forest Model
-# ------------------------------
-rf = RandomForestRegressor(n_estimators=200, random_state=42)
-rf.fit(X, y1)
-joblib.dump(rf, "models/rf_model.pkl")
+df = preprocess_for_training(df)
 
-print("RF Completion R2:", r2_score(y1, rf.predict(X)))
+# Columns to predict (example targets)
+TARGET = "avg_completion_rate"
 
+# ---------------- CREATE PREPROCESSOR -------------------
+preprocessor, num_cols, cat_cols = create_preprocessor(df)
+preprocessor.fit(df)
 
-# ------------------------------
-# Train XGBoost Model
-# ------------------------------
-xgb_model = xgb.XGBRegressor(n_estimators=200, max_depth=4, learning_rate=0.1)
-xgb_model.fit(X, y1)
-xgb_model.save_model("models/xgb_model.json")
+os.makedirs("models", exist_ok=True)
+joblib.dump(preprocessor, "models/preprocessor.pkl")
+print("Saved: models/preprocessor.pkl")
 
-print("XGB Completion R2:", r2_score(y1, xgb_model.predict(X)))
+# ---------------- TRAIN 3 MODELS ------------------------
+modes = ["pre", "early", "full"]
 
-print("Training complete!")
+for mode in modes:
+    model = RandomForestRegressor(n_estimators=300, random_state=42)
+
+    X = df.drop(columns=[TARGET])
+    y = df[TARGET]
+
+    model.fit(X, y)
+
+    joblib.dump(model, f"models/model_{mode}.pkl")
+    print(f"Saved: models/model_{mode}.pkl")
