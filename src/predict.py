@@ -1,37 +1,23 @@
-import joblib
 import pandas as pd
-from tensorflow.keras import Sequential
-from tensorflow.keras.layers import Dense
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import r2_score
-from preprocess import load_fake_data, build_preprocessor, preprocess_data
+import joblib
+import xgboost as xgb
 
-df = load_fake_data("data/fake_kaltura_data.csv")
-preprocessor = build_preprocessor()
-X, y1, y2 = preprocess_data(df, preprocessor)
+def predict_new(csv_path):
+    df = pd.read_csv(csv_path)
 
-# -------------------------
-# Train Random Forest Model
-# -------------------------
-rf = RandomForestRegressor(n_estimators=150, random_state=42)
-rf.fit(X, y1)
-joblib.dump(rf, "models/rf_model.pkl")
+    preprocessor = joblib.load("models/preprocessor.pkl")
+    X = preprocessor.transform(df)
 
-# Evaluate
-y_pred = rf.predict(X)
-print("📌 RF Completion R2:", r2_score(y1, y_pred))
+    rf = joblib.load("models/rf_model.pkl")
 
-# -------------------------
-# Train DNN Model
-# -------------------------
-dnn = Sequential([
-    Dense(64, activation="relu", input_shape=(X.shape[1],)),
-    Dense(32, activation="relu"),
-    Dense(1)
-])
+    xgb_model = xgb.XGBRegressor()
+    xgb_model.load_model("models/xgb_model.json")
 
-dnn.compile(optimizer="adam", loss="mse")
-dnn.fit(X, y1, epochs=30, verbose=0)
-dnn.save("models/dnn_model.keras")
+    df["pred_completion_rf"] = rf.predict(X)
+    df["pred_completion_xgb"] = xgb_model.predict(X)
 
-print("Training complete!")
+    return df
+
+if __name__ == "__main__":
+    preds = predict_new("data/fake_kaltura_data.csv")
+    print(preds.head())
